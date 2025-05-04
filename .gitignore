@@ -1,0 +1,9 @@
+*.pptx
+*.pdf
+*.Rproj
+*.txt
+*.tsv
+.Rhistory
+.Rproj.user/
+*.csv
+*.xlsx
