@@ -18,19 +18,26 @@ state_regions <- read.csv("metadata/State_Region.csv")
 
 
 
-col_metadata <- c("location_id", "Division", "Gov")
+col_metadata <- c("location_id", "Division", "Gov", "location_state_us")
 shelter_metadata <- data_of_interest[, col_metadata] |> unique()
+View(shelter_metadata %>% group_by(Division, location_state_us) %>% summarise(count=n()))
 
-View(shelter_metadata %>% group_by(Division, Gov) %>% summarise(count=n()))
-
-
-
-colors = c("#000080", "#008080", "#014421", "#301934",
-          "#36454F", " #2F4F4F", "#4B0082", "#800000", "#556B2F",
-          "#5C4033")
 
 
 library(lme4)
+
+
+model_summary <- function(glmm){
+
+  confint_mat <- confint(glmm, method="Wald")[3:5, ]
+  colnames(confint_mat) <- c("lower", "upper")
+  significance <- summary(glmm)
+  significance_mat <- significance$coefficients[2:4, ]
+  colnames(significance_mat) <- c("Estimate", "SE", "Z", "Pval")
+  output_mat <- cbind(significance_mat, confint_mat)
+  return(output_mat)
+
+}
 
 
 glmm_subset <- function(input_df, division){
@@ -40,7 +47,7 @@ glmm_subset <- function(input_df, division){
 
 
   # sum all the 12 months by years
-  counts_subset_by_year <- counts_subset %>% select(-Gov) %>% group_by(location_id, year_of_record, Division) %>%
+  counts_subset_by_year <- counts_subset %>% select(-c(Gov, location_state_us)) %>% group_by(location_id, year_of_record, Division) %>%
     summarise(across(everything(), sum))
 
 
@@ -60,90 +67,89 @@ glmm_subset <- function(input_df, division){
   intake_trend_coefs <- list()
 
   # total numbers of intake
-  total_intake <- glmer(gross_intakes ~ t1+t2+t3+(1|location_id),
-                        family=poisson, data=counts_subset_by_year) |> summary()
-  intake_trend_coefs$total_intake <- total_intake$coefficients[2:4, c(1,4)]
+  total_intake <- glmer(gross_intakes ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                        family=poisson, data=counts_subset_by_year)
+  intake_trend_coefs$total_intake <- model_summary(total_intake)
 
 
   # community intake vs transfer
-  community_vs_transfer <- glmer(cbind(net_intakes, transferred_in_total) ~ t1+t2+t3+(1|location_id),
-                                 family=binomial, data=counts_subset_by_year) |> summary()
-  intake_trend_coefs$community_vs_transferin <- community_vs_transfer$coefficients[2:4, c(1,4)]
+  community_vs_transfer <- glmer(cbind(net_intakes, transferred_in_total) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                 family=binomial, data=counts_subset_by_year)
+  intake_trend_coefs$community_vs_transferin <- model_summary(community_vs_transfer)
 
 
 
   # surrender vs stray among community intakes
-  surrender_vs_stray <- glmer(cbind(owner_total, stray_at_large_total) ~ t1+t2+t3+(1|location_id),
-                              family=binomial, data=counts_subset_by_year) |> summary()
-  intake_trend_coefs$surrender_vs_stray <- surrender_vs_stray$coefficients[2:4, c(1,4)]
+  surrender_vs_stray <- glmer(cbind(owner_total, stray_at_large_total) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                              family=binomial, data=counts_subset_by_year)
+  intake_trend_coefs$surrender_vs_stray <- model_summary(surrender_vs_stray)
 
 
 
 
   # youth vs adult in community intakes
-  youth_vs_adult_community <- glmer(cbind(youth_community_total, adult_community_total) ~ t1+t2+t3+(1|location_id),
-                                    family=binomial, data=counts_subset_by_year) |> summary()
-  intake_trend_coefs$youth_vs_adult_community <- youth_vs_adult_community$coefficients[2:4, c(1,4)]
+  youth_vs_adult_community <- glmer(cbind(youth_community_total, adult_community_total) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                    family=binomial, data=counts_subset_by_year)
+  intake_trend_coefs$youth_vs_adult_community <- model_summary(youth_vs_adult_community)
 
 
 
   # youth vs adult in transfer-ins
-  youth_vs_adult_transferin <- glmer(cbind(youth_transferred_in_total_count, adult_transferred_in_total_count) ~ t1+t2+t3+(1|location_id),
-                                     family=binomial, data=counts_subset_by_year) |> summary()
-  intake_trend_coefs$youth_vs_adult_transferin <- youth_vs_adult_transferin$coefficients[2:4, c(1,4)]
+  youth_vs_adult_transferin <- glmer(cbind(youth_transferred_in_total_count, adult_transferred_in_total_count) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                     family=binomial, data=counts_subset_by_year)
+  intake_trend_coefs$youth_vs_adult_transferin <- model_summary(youth_vs_adult_transferin)
 
 
   ## outcome trends
-
   outcome_trend_coefs <- list()
 
   # total number of outcomes
-  total_outcome <- glmer(gross_outcomes ~ t1+t2+t3+(1|location_id),
-                         family=poisson, data=counts_subset_by_year) |> summary()
-  outcome_trend_coefs$total_outcome <- total_outcome$coefficients[2:4, c(1,4)]
+  total_outcome <- glmer(gross_outcomes ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                         family=poisson, data=counts_subset_by_year)
+  outcome_trend_coefs$total_outcome <- model_summary(total_outcome)
 
 
   # total live vs nonlive outcomes
-  live_vs_nonlive <- glmer(cbind(live_outcomes, other_outcomes) ~ t1+t2+t3+(1|location_id),
-                           family=binomial, data=counts_subset_by_year) |> summary()
-  outcome_trend_coefs$live_vs_nonlive <- live_vs_nonlive$coefficients[2:4, c(1,4)]
+  live_vs_nonlive <- glmer(cbind(live_outcomes, other_outcomes) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                           family=binomial, data=counts_subset_by_year)
+  outcome_trend_coefs$live_vs_nonlive <- model_summary(live_vs_nonlive)
 
 
 
   # total adoption vs transfer out
 
-  adoption_vs_transfer <- glmer(cbind(adoption_rto, transferred_out_total) ~ t1+t2+t3+(1|location_id),
-                                family=binomial, data=counts_subset_by_year) |> summary()
-  outcome_trend_coefs$adoption_vs_transfer <- adoption_vs_transfer$coefficients[2:4, c(1,4)]
+  adoption_vs_transfer <- glmer(cbind(adoption_rto, transferred_out_total) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                family=binomial, data=counts_subset_by_year)
+  outcome_trend_coefs$adoption_vs_transfer <- model_summary(adoption_vs_transfer)
 
 
   ## Next step is to break down to adult and youth
 
 
   # adult live vs nonlive outcomes
-  adult_live_vs_nonlive <- glmer(cbind(adult_live_outcomes, adult_other_outcomes) ~ t1+t2+t3+(1|location_id),
-                                 family=binomial, data=counts_subset_by_year) |> summary()
-  outcome_trend_coefs$adult_live_vs_nonlive <- adult_live_vs_nonlive$coefficients[2:4, c(1,4)]
+  adult_live_vs_nonlive <- glmer(cbind(adult_live_outcomes, adult_other_outcomes) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                 family=binomial, data=counts_subset_by_year)
+  outcome_trend_coefs$adult_live_vs_nonlive <- model_summary(adult_live_vs_nonlive)
 
 
 
   # adult adoption vs transfer
-  adult_adoption_vs_transfer <- glmer(cbind(adult_adoption_rto, adult_transferred_out_total_count) ~ t1+t2+t3+(1|location_id),
-                                      family=binomial, data=counts_subset_by_year) |> summary()
-  outcome_trend_coefs$adult_adoption_vs_transfer <- adult_adoption_vs_transfer$coefficients[2:4, c(1,4)]
+  adult_adoption_vs_transfer <- glmer(cbind(adult_adoption_rto, adult_transferred_out_total_count) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                      family=binomial, data=counts_subset_by_year)
+  outcome_trend_coefs$adult_adoption_vs_transfer <- model_summary(adult_adoption_vs_transfer)
 
 
   # youth live vs nonlive outcomes
-  youth_live_vs_nonlive <- glmer(cbind(youth_live_outcomes, youth_other_outcomes) ~ t1+t2+t3+(1|location_id),
-                                 family=binomial, data=counts_subset_by_year) |> summary()
-  outcome_trend_coefs$youth_live_vs_nonlive <- youth_live_vs_nonlive$coefficients[2:4, c(1,4)]
+  youth_live_vs_nonlive <- glmer(cbind(youth_live_outcomes, youth_other_outcomes) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                 family=binomial, data=counts_subset_by_year)
+  outcome_trend_coefs$youth_live_vs_nonlive <- model_summary(youth_live_vs_nonlive)
 
 
 
   # youth adoption vs transfer outcomes
-  youth_adoption_vs_transfer <- glmer(cbind(youth_adoption_rto, youth_transferred_out_total_count) ~ t1+t2+t3+(1|location_id),
-                                      family=binomial, data=counts_subset_by_year) |> summary()
-  outcome_trend_coefs$youth_adoption_vs_transfer <- youth_adoption_vs_transfer$coefficients[2:4, c(1,4)]
+  youth_adoption_vs_transfer <- glmer(cbind(youth_adoption_rto, youth_transferred_out_total_count) ~ t1+t2+t3+(1+t1+t2+t3||location_id),
+                                      family=binomial, data=counts_subset_by_year)
+  outcome_trend_coefs$youth_adoption_vs_transfer <- model_summary(youth_adoption_vs_transfer)
 
   return(list(intake=intake_trend_coefs, outcome=outcome_trend_coefs))
 
@@ -152,6 +158,17 @@ glmm_subset <- function(input_df, division){
 
 
 all_divisions <- unique(data_of_interest$Division)
+
+intake_criteria <- c("total_intake", "community_vs_transferin", "surrender_vs_stray",
+                     "youth_vs_adult_community", "youth_vs_adult_transferin")
+
+
+outcome_criteria <- c("total_outcome", "live_vs_nonlive", "adoption_vs_transfer",
+                      "adult_live_vs_nonlive", "adult_adoption_vs_transfer",
+                      "youth_live_vs_nonlive", "youth_adoption_vs_transfer")
+
+
+criteria <- c(intake_criteria, outcome_criteria)
 
 all_results <- list()
 for (division in all_divisions){
@@ -162,27 +179,306 @@ for (division in all_divisions){
 }
 
 
-# ## select all the columns that are involved in the glmms
-# count_subset_gov <- count_subset_gov %>% select(location_id, year_of_record, Gov, net_intakes, gross_intakes,
-#                                                 relinquished_by_owner_total, stray_at_large_total,
-#                                                 youth_community_total, adult_community_total,)
+
+intake_estimate_list <- list()
+intake_pval_list <- list()
+intake_lower_bound_list <- list()
+intake_upper_bound_list <- list()
+
+for (crt in intake_criteria){
+
+  estimate_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+  pval_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+  lower_bound_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+  upper_bound_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+
+  rownames(estimate_mat) <- rownames(pval_mat) <- rownames(lower_bound_mat) <- rownames(upper_bound_mat) <- all_divisions
+  colnames(estimate_mat) <- colnames(pval_mat) <- colnames(lower_bound_mat) <- colnames(upper_bound_mat) <- c("21-22", "22-23", "23-24")
+
+  for(j in 1:length(all_divisions)){
+
+    division <- all_divisions[j]
+    result <- all_results[[division]][["intake"]][[crt]]
+    estimate_mat[j, ] <- result[, "Estimate"]
+    pval_mat[j, ] <- result[, "Pval"]
+    lower_bound_mat[j, ] <- result[, "lower"]
+    upper_bound_mat[j, ] <- result[, "upper"]
+
+  }
+
+  intake_estimate_list[[crt]] <- estimate_mat
+  intake_pval_list[[crt]] <- pval_mat
+  intake_lower_bound_list[[crt]] <- lower_bound_mat
+  intake_upper_bound_list[[crt]] <- upper_bound_mat
+
+}
+
+
+outcome_estimate_list <- list()
+outcome_pval_list <- list()
+outcome_lower_bound_list <- list()
+outcome_upper_bound_list <- list()
+
+for (crt in outcome_criteria){
+
+  estimate_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+  pval_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+  lower_bound_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+  upper_bound_mat <- matrix(0, nrow=length(all_divisions), ncol=3)
+
+  rownames(estimate_mat) <- rownames(pval_mat) <- rownames(lower_bound_mat) <- rownames(upper_bound_mat) <- all_divisions
+  colnames(estimate_mat) <- colnames(pval_mat) <- colnames(lower_bound_mat) <- colnames(upper_bound_mat) <- c("21-22", "22-23", "23-24")
+
+  for(j in 1:length(all_divisions)){
+
+    division <- all_divisions[j]
+    result <- all_results[[division]][["outcome"]][[crt]]
+    estimate_mat[j, ] <- result[, "Estimate"]
+    pval_mat[j, ] <- result[, "Pval"]
+    lower_bound_mat[j, ] <- result[, "lower"]
+    upper_bound_mat[j, ] <- result[, "upper"]
+
+  }
+
+  outcome_estimate_list[[crt]] <- estimate_mat
+  outcome_pval_list[[crt]] <- pval_mat
+  outcome_lower_bound_list[[crt]] <- lower_bound_mat
+  outcome_upper_bound_list[[crt]] <- upper_bound_mat
+
+}
+
+
+
+
+# adjust p values
+# intake_pvals <- do.call(rbind, intake_pval_list)
+# outcome_pvals <- do.call(rbind, outcome_pval_list)
+#
+# all_pvals <- rbind(intake_pvals, outcome_pvals)
+# all_pvals_adjusted <- all_pvals
+# all_pvals_adjusted[, 1] <- p.adjust(all_pvals_adjusted[, 1], method="BH")
+# all_pvals_adjusted[, 2] <- p.adjust(all_pvals_adjusted[, 2], method="BH")
+# all_pvals_adjusted[, 3] <- p.adjust(all_pvals_adjusted[, 3], method="BH")
+#
+# intake_pvals_adjusted <- all_pvals_adjusted[1:nrow(intake_pvals), ]
+# outcome_pvals_adjusted <- all_pvals_adjusted[(nrow(intake_pvals)+1):nrow(all_pvals_adjusted), ]
+#
+# for (j in 1:5){
+#   subset_intake_pvals <- intake_pvals_adjusted[((j-1)*9+1):(j*9), ]
+#   intake_pval_list[[j]] <- subset_intake_pvals
+# }
+# for (j in 1:7){
+#   subset_outcome_pvals <- outcome_pvals_adjusted[((j-1)*9+1):(j*9), ]
+#   outcome_pval_list[[j]] <- subset_outcome_pvals
+# }
 #
 
-# plot total number of intakes
-# ggplot(counts_subset_by_year, aes(x=year_of_record, y=gross_intakes, group=location_id)) +
-#   geom_point(aes(color=Type), size=1.2, alpha=0.5) + geom_line(aes(color=Type, linetype=Gov), size=1, alpha=0.5) +
-#   xlab("Year") + ylab("Total Number of Annual Intake") +
-#   scale_x_continuous(breaks=seq(2021, 2024))+
-#   scale_y_log10(breaks=c(seq(300, 1000, 100), seq(1000,5000, 500)))+
-#   scale_color_manual(values = c("Shelter" = "#000080", "Rescue" = "#800000"), name = "Organization Type")+
-#   scale_linetype_manual(values = c("Yes" = "solid", "No" = "dotdash"), name = "Government Affiliated")+
-#   theme(
-#     legend.position = "bottom",
-#     legend.justification = "top"
-#   )
+saveRDS(list(estimate=intake_estimate_list,
+             pval=intake_pval_list,
+             lower_bound=intake_lower_bound_list,
+             upper_bound=intake_upper_bound_list),
+         file="data/intake_result.rds")
+
+
+saveRDS(list(estimate=outcome_estimate_list,
+             pval=outcome_pval_list,
+             lower_bound=outcome_lower_bound_list,
+             upper_bound=outcome_upper_bound_list),
+        file="data/outcome_result.rds")
 
 
 
-# table(counts_subset$org_type)
+# visualize significance and examples
+
+library(circlize)
+library(ComplexHeatmap)
+
+data_by_years <- data_of_interest %>% select(-Gov) %>%
+  group_by(location_id, year_of_record, Division, location_state_us) %>%
+  summarise_all(sum)
+data_by_years$year_of_record <- data_by_years$year_of_record - 2000
+
+
+
+col_fun <- colorRamp2(c(1, 0, -1), c("#A00000", "white", "#0000A0"))
+
+# total intake
+total_intake_directions <- 2*((intake_estimate_list$total_intake > 0) - 0.5) *
+  (intake_pval_list$total_intake < 0.05)
+total_intake_heatmap <- save_heatmap(X=total_intake_directions,
+             entry_name="direction",
+             title_name="Total Intake Number",
+             cmap=col_fun,
+             border_col="black",
+             legend=F)
+
+total_intake_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=gross_intakes, group=location_id)) +
+  geom_point(size=1.2, alpha=0.6) +
+  geom_line(linewidth=1, alpha=0.6) +
+  scale_y_log10(breaks=c(100, 200, 500, 1000, 2000, 5000, 10000, 20000))+
+  scale_x_continuous(breaks=c(21, 22, 23, 24))+
+  facet_wrap(vars(Division), nrow=2)+
+  xlab("Year") + ylab("Total Intake Number")
+
+# community intake proportion
+community_vs_transferin_directions <- 2*((intake_estimate_list$community_vs_transferin > 0) - 0.5) *
+  (intake_pval_list$community_vs_transferin < 0.05)
+community_vs_transferin_heatmap <- save_heatmap(X=community_vs_transferin_directions,
+                                                entry_name="direction",
+                                                title_name="Community Intake vs. Transfer-in Ratio",
+                                                cmap=col_fun,
+                                                border_col="black",
+                                                legend=F)
+
+
+data_by_years$Community_Intake_Proportion <- data_by_years$net_intakes / data_by_years$gross_intakes
+community_intake_proportion_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=Community_Intake_Proportion, group=location_id)) +
+  geom_point(size=1.2, alpha=0.6) +
+  geom_line(linewidth=1, alpha=0.6) +
+  scale_y_continuous(breaks=seq(0, 1, 0.1))+
+  scale_x_continuous(breaks=c(21, 22, 23, 24))+
+  facet_wrap(vars(Division), nrow=2)+
+  xlab("Year") + ylab("Proportion of Community Intake among All Intakes")
+
+# surrender proportion
+surrender_vs_stray_directions <- 2*((intake_estimate_list$surrender_vs_stray > 0) - 0.5) *
+  (intake_pval_list$surrender_vs_stray < 0.05)
+surrender_vs_stray_heatmap <- save_heatmap(X=surrender_vs_stray_directions,
+                                                entry_name="direction",
+                                                title_name="Surrender vs. Stray Ratio",
+                                                cmap=col_fun,
+                                                border_col="black",
+                                                legend=F)
+
+data_by_years$surrender_proportion<- data_by_years$owner_total /
+  (data_by_years$owner_total + data_by_years$stray_at_large_total)
+
+surrender_proportion_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=surrender_proportion, group=location_id)) +
+  geom_point(size=1.2, alpha=0.6) +
+  geom_line(linewidth=1, alpha=0.6) +
+  scale_y_continuous(breaks=seq(0, 1, 0.1))+
+  scale_x_continuous(breaks=c(21, 22, 23, 24))+
+  facet_wrap(vars(Division), nrow=2)+
+  xlab("Year") + ylab("Proportion of Owner Surrender among Community Intakes")
+
+
+
+# youth proportion in community
+youth_vs_adult_community <- 2*((intake_estimate_list$youth_vs_adult_community > 0) - 0.5) *
+  (intake_pval_list$youth_vs_adult_community < 0.05)
+
+youth_vs_adult_community_heatmap <- save_heatmap(X=youth_vs_adult_community,
+                                           entry_name="direction",
+                                           title_name="Youth vs. Adult among Community Intakes",
+                                           cmap=col_fun,
+                                           border_col="black",
+                                           legend=F)
+
+
+
+data_by_years$youth_intake_proportion_community <- data_by_years$youth_community_total/
+  (data_by_years$youth_community_total + data_by_years$adult_community_total)
+youth_intake_proportion_community_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=youth_intake_proportion_community, group=location_id)) +
+  geom_point(size=1.2, alpha=0.6) +
+  geom_line(linewidth=1, alpha=0.6) +
+  scale_y_continuous(breaks=seq(0, 1, 0.1))+
+  scale_x_continuous(breaks=c(21, 22, 23, 24))+
+  facet_wrap(vars(Division), nrow=2)+
+  xlab("Year") + ylab("Proportion of Youth Dogs among Community Intakes")
+
+
+
+# youth proportion in transferin animals
+youth_vs_adult_transferin <- 2*((intake_estimate_list$youth_vs_adult_transferin > 0) - 0.5) *
+  (intake_pval_list$youth_vs_adult_transferin < 0.05)
+youth_vs_adult_transferin_heatmap <- save_heatmap(X=youth_vs_adult_transferin,
+                                                 entry_name="direction",
+                                                 title_name="Youth vs. Adult among Transfer-ins",
+                                                 cmap=col_fun,
+                                                 border_col="black",
+                                                 legend=F)
+
+
+
+data_by_years$youth_intake_proportion_transferin <- data_by_years$youth_transferred_in_total_count/
+  (data_by_years$youth_transferred_in_total_count + data_by_years$adult_transferred_in_total_count)
+youth_intake_proportion_transferin_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=youth_intake_proportion_transferin , group=location_id)) +
+  geom_point(size=1.2, alpha=0.6) +
+  geom_line(linewidth=1, alpha=0.6) +
+  scale_y_continuous(breaks=seq(0, 1, 0.1))+
+  scale_x_continuous(breaks=c(21, 22, 23, 24))+
+  facet_wrap(vars(Division), nrow=2)+
+  xlab("Year") + ylab("Proportion of Youth Dogs among Transfer-in")
+
+
+
+
+
+total_outcome_directions <- 2*((outcome_estimate_list$total_outcome > 0) - 0.5) *
+  (outcome_pval_list$total_outcome < 0.05)
+total_outcome_heatmap <- save_heatmap(X=total_outcome_directions,
+                                                  entry_name="direction",
+                                                  title_name="Total Outcome Number",
+                                                  cmap=col_fun,
+                                                  border_col="black",
+                                                  legend=F)
+
+
+live_vs_nonlive_directions <- 2*((outcome_estimate_list$live_vs_nonlive > 0) - 0.5) *
+  (outcome_pval_list$live_vs_nonlive < 0.05)
+live_vs_nonlive_heatmap <- save_heatmap(X=live_vs_nonlive_directions,
+                                      entry_name="direction",
+                                      title_name="Live vs. Nonlive Outcomes Ratio",
+                                      cmap=col_fun,
+                                      border_col="black",
+                                      legend=F)
+
+adoption_vs_transfer_directions <- 2*((outcome_estimate_list$adoption_vs_transfer > 0) - 0.5) *
+  (outcome_pval_list$adoption_vs_transfer < 0.05)
+adoption_vs_transfer_heatmap <- save_heatmap(X=adoption_vs_transfer_directions,
+                                        entry_name="direction",
+                                        title_name="Adoptions vs. Transfer-out",
+                                        cmap=col_fun,
+                                        border_col="black",
+                                        legend=F)
+
+
+adult_live_vs_nonlive_directions <- 2*((outcome_estimate_list$adult_live_vs_nonlive > 0) - 0.5) *
+  (outcome_pval_list$adult_live_vs_nonlive < 0.05)
+adult_live_vs_nonlive_heatmap <- save_heatmap(X=adult_live_vs_nonlive_directions,
+                                        entry_name="direction",
+                                        title_name="Adult Live vs. Nonlive Outcomes Ratio",
+                                        cmap=col_fun,
+                                        border_col="black",
+                                        legend=F)
+
+adult_adoption_vs_transfer_directions <- 2*((outcome_estimate_list$adult_adoption_vs_transfer > 0) - 0.5) *
+  (outcome_pval_list$adult_adoption_vs_transfer < 0.05)
+adult_adoption_vs_transfer_heatmap <- save_heatmap(X=adult_adoption_vs_transfer_directions,
+                                              entry_name="direction",
+                                              title_name="Adult Adoptions vs. Transfer-out",
+                                              cmap=col_fun,
+                                              border_col="black",
+                                              legend=F)
+
+
+youth_live_vs_nonlive_directions <- 2*((outcome_estimate_list$youth_live_vs_nonlive > 0) - 0.5) *
+  (outcome_pval_list$youth_live_vs_nonlive < 0.05)
+youth_live_vs_nonlive_heatmap <- save_heatmap(X=youth_live_vs_nonlive_directions,
+                                              entry_name="direction",
+                                              title_name="Youth Live vs. Nonlive Outcomes Ratio",
+                                              cmap=col_fun,
+                                              border_col="black",
+                                              legend=F)
+
+
+youth_adoption_vs_transfer_directions <- 2*((outcome_estimate_list$youth_adoption_vs_transfer > 0) - 0.5) *
+  (outcome_pval_list$youth_adoption_vs_transfer < 0.05)
+youth_adoption_vs_transfer_heatmap <- save_heatmap(X=youth_adoption_vs_transfer_directions,
+                                                   entry_name="direction",
+                                                   title_name="Youth Adoptions vs. Transfer-out",
+                                                   cmap=col_fun,
+                                                   border_col="black",
+                                                   legend=F)
 
 

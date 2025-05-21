@@ -32,7 +32,7 @@ clean_data <- function(count_data){
 
   # only select columns that we are interested in
 
-  count_data <- count_data %>% select(location_id, year_of_record,  month_of_record, Gov, Division, # metadata
+  count_data <- count_data %>% select(location_id, year_of_record,  month_of_record, Gov, Division, location_state_us, # metadata
                                       gross_intakes, # total number of intakes
                                       net_intakes, transferred_in_total, # community intake vs transferred in
                                       owner_total, stray_at_large_total, # surrendered/seized from owner vs stray
