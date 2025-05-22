@@ -162,7 +162,6 @@ all_divisions <- unique(data_of_interest$Division)
 intake_criteria <- c("total_intake", "community_vs_transferin", "surrender_vs_stray",
                      "youth_vs_adult_community", "youth_vs_adult_transferin")
 
-
 outcome_criteria <- c("total_outcome", "live_vs_nonlive", "adoption_vs_transfer",
                       "adult_live_vs_nonlive", "adult_adoption_vs_transfer",
                       "youth_live_vs_nonlive", "youth_adoption_vs_transfer")
@@ -312,13 +311,7 @@ total_intake_heatmap <- save_heatmap(X=total_intake_directions,
              border_col="black",
              legend=F)
 
-total_intake_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=gross_intakes, group=location_id)) +
-  geom_point(size=1.2, alpha=0.6) +
-  geom_line(linewidth=1, alpha=0.6) +
-  scale_y_log10(breaks=c(100, 200, 500, 1000, 2000, 5000, 10000, 20000))+
-  scale_x_continuous(breaks=c(21, 22, 23, 24))+
-  facet_wrap(vars(Division), nrow=2)+
-  xlab("Year") + ylab("Total Intake Number")
+
 
 # community intake proportion
 community_vs_transferin_directions <- 2*((intake_estimate_list$community_vs_transferin > 0) - 0.5) *
@@ -331,15 +324,6 @@ community_vs_transferin_heatmap <- save_heatmap(X=community_vs_transferin_direct
                                                 legend=F)
 
 
-data_by_years$Community_Intake_Proportion <- data_by_years$net_intakes / data_by_years$gross_intakes
-community_intake_proportion_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=Community_Intake_Proportion, group=location_id)) +
-  geom_point(size=1.2, alpha=0.6) +
-  geom_line(linewidth=1, alpha=0.6) +
-  scale_y_continuous(breaks=seq(0, 1, 0.1))+
-  scale_x_continuous(breaks=c(21, 22, 23, 24))+
-  facet_wrap(vars(Division), nrow=2)+
-  xlab("Year") + ylab("Proportion of Community Intake among All Intakes")
-
 # surrender proportion
 surrender_vs_stray_directions <- 2*((intake_estimate_list$surrender_vs_stray > 0) - 0.5) *
   (intake_pval_list$surrender_vs_stray < 0.05)
@@ -349,18 +333,6 @@ surrender_vs_stray_heatmap <- save_heatmap(X=surrender_vs_stray_directions,
                                                 cmap=col_fun,
                                                 border_col="black",
                                                 legend=F)
-
-data_by_years$surrender_proportion<- data_by_years$owner_total /
-  (data_by_years$owner_total + data_by_years$stray_at_large_total)
-
-surrender_proportion_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=surrender_proportion, group=location_id)) +
-  geom_point(size=1.2, alpha=0.6) +
-  geom_line(linewidth=1, alpha=0.6) +
-  scale_y_continuous(breaks=seq(0, 1, 0.1))+
-  scale_x_continuous(breaks=c(21, 22, 23, 24))+
-  facet_wrap(vars(Division), nrow=2)+
-  xlab("Year") + ylab("Proportion of Owner Surrender among Community Intakes")
-
 
 
 # youth proportion in community
@@ -376,18 +348,6 @@ youth_vs_adult_community_heatmap <- save_heatmap(X=youth_vs_adult_community,
 
 
 
-data_by_years$youth_intake_proportion_community <- data_by_years$youth_community_total/
-  (data_by_years$youth_community_total + data_by_years$adult_community_total)
-youth_intake_proportion_community_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=youth_intake_proportion_community, group=location_id)) +
-  geom_point(size=1.2, alpha=0.6) +
-  geom_line(linewidth=1, alpha=0.6) +
-  scale_y_continuous(breaks=seq(0, 1, 0.1))+
-  scale_x_continuous(breaks=c(21, 22, 23, 24))+
-  facet_wrap(vars(Division), nrow=2)+
-  xlab("Year") + ylab("Proportion of Youth Dogs among Community Intakes")
-
-
-
 # youth proportion in transferin animals
 youth_vs_adult_transferin <- 2*((intake_estimate_list$youth_vs_adult_transferin > 0) - 0.5) *
   (intake_pval_list$youth_vs_adult_transferin < 0.05)
@@ -400,20 +360,7 @@ youth_vs_adult_transferin_heatmap <- save_heatmap(X=youth_vs_adult_transferin,
 
 
 
-data_by_years$youth_intake_proportion_transferin <- data_by_years$youth_transferred_in_total_count/
-  (data_by_years$youth_transferred_in_total_count + data_by_years$adult_transferred_in_total_count)
-youth_intake_proportion_transferin_lineplot <- ggplot(data_by_years, aes(x=year_of_record, y=youth_intake_proportion_transferin , group=location_id)) +
-  geom_point(size=1.2, alpha=0.6) +
-  geom_line(linewidth=1, alpha=0.6) +
-  scale_y_continuous(breaks=seq(0, 1, 0.1))+
-  scale_x_continuous(breaks=c(21, 22, 23, 24))+
-  facet_wrap(vars(Division), nrow=2)+
-  xlab("Year") + ylab("Proportion of Youth Dogs among Transfer-in")
-
-
-
-
-
+# total outcome
 total_outcome_directions <- 2*((outcome_estimate_list$total_outcome > 0) - 0.5) *
   (outcome_pval_list$total_outcome < 0.05)
 total_outcome_heatmap <- save_heatmap(X=total_outcome_directions,
@@ -423,7 +370,7 @@ total_outcome_heatmap <- save_heatmap(X=total_outcome_directions,
                                                   border_col="black",
                                                   legend=F)
 
-
+# live vs nonlive outcomes
 live_vs_nonlive_directions <- 2*((outcome_estimate_list$live_vs_nonlive > 0) - 0.5) *
   (outcome_pval_list$live_vs_nonlive < 0.05)
 live_vs_nonlive_heatmap <- save_heatmap(X=live_vs_nonlive_directions,
@@ -433,6 +380,8 @@ live_vs_nonlive_heatmap <- save_heatmap(X=live_vs_nonlive_directions,
                                       border_col="black",
                                       legend=F)
 
+
+# adoption vs transfer-outs
 adoption_vs_transfer_directions <- 2*((outcome_estimate_list$adoption_vs_transfer > 0) - 0.5) *
   (outcome_pval_list$adoption_vs_transfer < 0.05)
 adoption_vs_transfer_heatmap <- save_heatmap(X=adoption_vs_transfer_directions,
@@ -443,6 +392,7 @@ adoption_vs_transfer_heatmap <- save_heatmap(X=adoption_vs_transfer_directions,
                                         legend=F)
 
 
+# adult live vs nonlive
 adult_live_vs_nonlive_directions <- 2*((outcome_estimate_list$adult_live_vs_nonlive > 0) - 0.5) *
   (outcome_pval_list$adult_live_vs_nonlive < 0.05)
 adult_live_vs_nonlive_heatmap <- save_heatmap(X=adult_live_vs_nonlive_directions,
@@ -452,6 +402,8 @@ adult_live_vs_nonlive_heatmap <- save_heatmap(X=adult_live_vs_nonlive_directions
                                         border_col="black",
                                         legend=F)
 
+
+# adult adoption vs transfer
 adult_adoption_vs_transfer_directions <- 2*((outcome_estimate_list$adult_adoption_vs_transfer > 0) - 0.5) *
   (outcome_pval_list$adult_adoption_vs_transfer < 0.05)
 adult_adoption_vs_transfer_heatmap <- save_heatmap(X=adult_adoption_vs_transfer_directions,
@@ -462,6 +414,7 @@ adult_adoption_vs_transfer_heatmap <- save_heatmap(X=adult_adoption_vs_transfer_
                                               legend=F)
 
 
+# youth live vs nonlive
 youth_live_vs_nonlive_directions <- 2*((outcome_estimate_list$youth_live_vs_nonlive > 0) - 0.5) *
   (outcome_pval_list$youth_live_vs_nonlive < 0.05)
 youth_live_vs_nonlive_heatmap <- save_heatmap(X=youth_live_vs_nonlive_directions,
@@ -471,7 +424,7 @@ youth_live_vs_nonlive_heatmap <- save_heatmap(X=youth_live_vs_nonlive_directions
                                               border_col="black",
                                               legend=F)
 
-
+# youth adoption vs transfer-out
 youth_adoption_vs_transfer_directions <- 2*((outcome_estimate_list$youth_adoption_vs_transfer > 0) - 0.5) *
   (outcome_pval_list$youth_adoption_vs_transfer < 0.05)
 youth_adoption_vs_transfer_heatmap <- save_heatmap(X=youth_adoption_vs_transfer_directions,
