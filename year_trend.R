@@ -29,7 +29,7 @@ library(lme4)
 
 model_summary <- function(glmm){
 
-  confint_mat <- confint(glmm, method="Wald")[3:5, ]
+  confint_mat <- confint(glmm, method="Wald")[6:8, ]
   colnames(confint_mat) <- c("lower", "upper")
   significance <- summary(glmm)
   significance_mat <- significance$coefficients[2:4, ]
@@ -179,6 +179,7 @@ for (division in all_divisions){
 
 
 
+
 intake_estimate_list <- list()
 intake_pval_list <- list()
 intake_lower_bound_list <- list()
@@ -250,27 +251,18 @@ for (crt in outcome_criteria){
 
 
 # adjust p values
-# intake_pvals <- do.call(rbind, intake_pval_list)
-# outcome_pvals <- do.call(rbind, outcome_pval_list)
-#
-# all_pvals <- rbind(intake_pvals, outcome_pvals)
-# all_pvals_adjusted <- all_pvals
-# all_pvals_adjusted[, 1] <- p.adjust(all_pvals_adjusted[, 1], method="BH")
-# all_pvals_adjusted[, 2] <- p.adjust(all_pvals_adjusted[, 2], method="BH")
-# all_pvals_adjusted[, 3] <- p.adjust(all_pvals_adjusted[, 3], method="BH")
-#
-# intake_pvals_adjusted <- all_pvals_adjusted[1:nrow(intake_pvals), ]
-# outcome_pvals_adjusted <- all_pvals_adjusted[(nrow(intake_pvals)+1):nrow(all_pvals_adjusted), ]
-#
-# for (j in 1:5){
-#   subset_intake_pvals <- intake_pvals_adjusted[((j-1)*9+1):(j*9), ]
-#   intake_pval_list[[j]] <- subset_intake_pvals
-# }
-# for (j in 1:7){
-#   subset_outcome_pvals <- outcome_pvals_adjusted[((j-1)*9+1):(j*9), ]
-#   outcome_pval_list[[j]] <- subset_outcome_pvals
-# }
-#
+for (j in 1:length(intake_pval_list)){
+  for (k in 1:3){
+    intake_pval_list[[j]][, k] <- p.adjust(intake_pval_list[[j]][, k], method="BH")
+  }
+}
+
+for (j in 1:length(outcome_pval_list)){
+  for (k in 1:3){
+    outcome_pval_list[[j]][, k] <- p.adjust(outcome_pval_list[[j]][, k], method="BH")
+  }
+}
+
 
 saveRDS(list(estimate=intake_estimate_list,
              pval=intake_pval_list,
@@ -291,6 +283,8 @@ saveRDS(list(estimate=outcome_estimate_list,
 
 library(circlize)
 library(ComplexHeatmap)
+
+source("visualization.R")
 
 data_by_years <- data_of_interest %>% select(-Gov) %>%
   group_by(location_id, year_of_record, Division, location_state_us) %>%
